@@ -77,11 +77,11 @@ def getAccessOpenIdToken(code, client_id, client_secret, redirect_uri):
 # 1.GetId
 # 2.GetCredentialsForIdentity
 def getCredentialsForIdentityWithCognito(client, id_token):
-    print ("INFO: Call GetId APIs")
+    print ('INFO: Call GetId APIs')
     response = client.get_id(AccountId=account_id,IdentityPoolId=identity_pool_id,Logins={'accounts.google.com': id_token})
     identity_id = response['IdentityId']
-    print ("INFO: Identity ID is ", identity_id)
-    print ("INFO: Call GetCredentialsForIdentity API")
+    print ('INFO: Identity ID is ', identity_id)
+    print ('INFO: Call GetCredentialsForIdentity API')
     simplified_authflow = client.get_credentials_for_identity(IdentityId=identity_id,Logins={'accounts.google.com': id_token})
     secretKey = simplified_authflow['Credentials']['SecretKey']
     accessKey = simplified_authflow['Credentials']['AccessKeyId']
@@ -94,18 +94,18 @@ def getCredentialsForIdentityWithCognito(client, id_token):
 # 2.GetOpenIdToken
 # 3.AssumeRoleWithWebIdentity
 def AssumeRoleWithWebIdentity(client, id_token):
-    print ("INFO: Call GetId APIs")
+    print ('INFO: Call GetId APIs')
     response = client.get_id(AccountId=account_id,IdentityPoolId=identity_pool_id,Logins={'accounts.google.com': id_token})
     identity_id = response['IdentityId']
-    print ("INFO: Identity ID is ", identity_id)
-    print ("INFO: Call GetOpenIdToken API")
+    print ('INFO: Identity ID is ', identity_id)
+    print ('INFO: Call GetOpenIdToken API')
     classic_authflow = client.get_open_id_token(IdentityId=identity_id,Logins={'accounts.google.com': id_token})
     token = classic_authflow['Token']
-    print("INFO: Google OpenID Token: ", id_token)
-    print("INFO: Cognito OpenID Token ", token)
-    print("INFO: Initialize STS Client ")
+    print ('INFO: Google OpenID Token: ', id_token)
+    print ('INFO: Cognito OpenID Token ', token)
+    print ('INFO: Initialize STS Client')
     sts_client = boto3.client('sts')
-    print("INFO: Call AssumeRoleWithWebIdentity API ")
+    print('INFO: Call AssumeRoleWithWebIdentity API')
     assume_role_response = sts_client.assume_role_with_web_identity(RoleArn=roleARN,RoleSessionName='invoke',WebIdentityToken=id_token,DurationSeconds=900)
     secretKey = assume_role_response['Credentials']['SecretAccessKey']
     accessKey = assume_role_response['Credentials']['AccessKeyId']
@@ -151,19 +151,19 @@ def main():
     print('INFO: OpenID Token: ', id_token)
     print('STEP [5] Call Cognito')
     cognito_client = boto3.client('cognito-identity',region_name=region)
-    print ("INFO: Using Cognito Enhanced (Simplified) Authflow")
+    print ('INFO: Using Cognito Enhanced (Simplified) Authflow')
     accessKey, secretKey, sessionToken, expiration = getCredentialsForIdentityWithCognito(cognito_client,id_token)
-    print ("INFO: AccessKey ", accessKey)
-    print ("INFO: SecretKey ", secretKey)
-    print ("INFO: Using Cognito Basic (Classic) Authflow")
+    print ('INFO: AccessKey ', accessKey)
+    print ('INFO: SecretKey ', secretKey)
+    print ('INFO: Using Cognito Basic (Classic) Authflow')
     accessKey, secretKey, sessionToken, expiration = getCredentialsForIdentityWithCognito(cognito_client,id_token)
-    print ("INFO: AccessKey ", accessKey)
-    print ("INFO: SecretKey ", secretKey)
+    print ('INFO: AccessKey ', accessKey)
+    print ('INFO: SecretKey ', secretKey)
     print ('STEP [6] Call AWS Services')
     print ('INFO: Invoke ', apiGatewayUri)
     response = callApiGatewayGet(apiGatewayUri,accessKey,secretKey,sessionToken)
     print ('INFO: Response ', response)
-    
+
 
 if __name__ == "__main__":
     main()
