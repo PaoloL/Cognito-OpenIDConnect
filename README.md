@@ -26,8 +26,31 @@ Once you've created an OpenID Connect provider in the IAM Console, you can assoc
 ![Provider Cognito](./AuthenticationProvider.png)
 
 ## Create Virtual Environment
+```
 virtualenv -p python3 openid
-source openid/bin/activate'''
+source openid/bin/activate
+```
 
 ### Install Dependencies
+```
+pip install httplib2
+pip install boto3
+pip install requests
 pip install requests-aws4auth
+```
+
+### Setting OAUTH2 credential
+```
+export OAUTH2_CLIENT_ID="123456789-abcdefghilmnopqrstuvxyz.apps.googleusercontent.com"  
+export OAUTH2_CLIENT_SECRET="abcdefghilmnopqrstuvxy"
+```
+
+### Launch the Google demo
+ ```
+ python google-oauth2.py
+ ```
+
+### Launch the SalesForce demo
+```
+python salesforce-oauth2.py
+```
