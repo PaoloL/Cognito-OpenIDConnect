@@ -163,8 +163,7 @@ def main():
     print ('INFO: Invoke ', apiGatewayUri)
     response = callApiGatewayGet(apiGatewayUri,accessKey,secretKey,sessionToken)
     print ('INFO: Response ', response)
-    #    response = cognito_client.get_credentials_for_identity(IdentityId=identity_pool_id,Logins={'logins.salesforce.com': id_token}, CustomRoleArn='string')
-
+    
 
 if __name__ == "__main__":
     main()
