@@ -2,6 +2,17 @@ __version__     = "1.0.1"
 __author__      = "Paolo Latella"
 __email__       = "paolo.latella@xpeppers.com"
 
+'''
+This code implement the authorization code grant.
+The authorization code grant type is used to obtain both access
+tokens and refresh tokens and is optimized for confidential clients.
+Since this is a redirection-based flow, the client must be capable of
+interacting with the resource owner's user-agent (typically a web
+browser) and capable of receiving incoming requests (via redirection)
+from the authorization server.
+https://tools.ietf.org/html/rfc6749#section-4.1
+'''
+
 import hashlib
 import os
 import re
@@ -16,6 +27,10 @@ oauth2_client_id = os.environ['OAUTH2_CLIENT_ID']
 oauth2_client_secret = os.environ['OAUTH2_CLIENT_SECRET']
 identity_pool_id = os.environ['COGNITO_POOL_ID']
 account_id = os.environ['AWS_ACCOUNT_ID']
+region = os.environ['AWS_REGION']
+roleARN = os.environ['COGNITO_ROLE_ARN']
+apiGatewayUri = os.environ['API_URI']
+
 
 # To be OpenID-compliant, you must include the openid profile scope in your authentication request.
 oauth2_scope = 'openid email profile'
@@ -38,13 +53,12 @@ def getConnectAuthURI(client_id, scope, redirect_uri, state):
 def verifyStateToken(uri,state):
     exp = re.compile(r'.*state=(.*)&code=')
     result = exp.search(uri)
+    reply_state = str(result.groups(1)[0])
     if (result):
-        print (str(result.groups(1)[0]))
-        print (state)
-        if (result.groups(1)[0] == state):
-            return True
+        if (reply_state == state):
+            return True, reply_state
         else:
-            return False
+            return False, reply_state
 
 # The response includes a code parameter, a one-time authorization code that your server can exchange for an access token and ID token
 def extractCode(uri):
@@ -59,79 +73,96 @@ def getAccessOpenIdToken(code, client_id, client_secret, redirect_uri):
     response = requests.post(uri, data=payload)
     return response
 
-#https://docs.aws.amazon.com/cognito/latest/developerguide/authentication-flow.html
-def getCredentialsForIdentityWithCognito(id_token):
-    cognito_client = boto3.client('cognito-identity',region_name='eu-west-1')
-
-    # Enhanced (Simplified) Authflow
-    # 1.GetId
-    # 2.GetCredentialsForIdentity
-    print ("Enhanced (Simplified) Authflow")
-    response = cognito_client.get_id(AccountId=account_id,IdentityPoolId=identity_pool_id,Logins={'accounts.google.com': id_token})
+# Exchange google token with Cognito token using Enhanced (Simplified) Authflow
+# 1.GetId
+# 2.GetCredentialsForIdentity
+def getCredentialsForIdentityWithCognito(client, id_token):
+    print ("INFO: Call GetId APIs")
+    response = client.get_id(AccountId=account_id,IdentityPoolId=identity_pool_id,Logins={'accounts.google.com': id_token})
     identity_id = response['IdentityId']
-    print ("Identity ID: %s"%identity_id)
-    simplified_authflow = cognito_client.get_credentials_for_identity(IdentityId=identity_id,Logins={'accounts.google.com': id_token})
+    print ("INFO: Identity ID is ", identity_id)
+    print ("INFO: Call GetCredentialsForIdentity API")
+    simplified_authflow = client.get_credentials_for_identity(IdentityId=identity_id,Logins={'accounts.google.com': id_token})
     secretKey = simplified_authflow['Credentials']['SecretKey']
     accessKey = simplified_authflow['Credentials']['AccessKeyId']
     sessionToken = simplified_authflow['Credentials']['SessionToken']
     expiration = simplified_authflow['Credentials']['Expiration']
-    # Basic (Classic) Authflow
-    # 1.GetId
-    # 2.GetOpenIdToken
-    # 3.AssumeRoleWithWebIdentity
-    print ("Basic (Classic) Authflow")
-    response = cognito_client.get_id(AccountId=account_id,IdentityPoolId=identity_pool_id,Logins={'accounts.google.com': id_token})
+    return accessKey, secretKey, sessionToken, expiration
+
+# Exchange google token with Cognito token using Basic (Classic) Authflow
+# 1.GetId
+# 2.GetOpenIdToken
+# 3.AssumeRoleWithWebIdentity
+def AssumeRoleWithWebIdentity(client, id_token):
+    print ("INFO: Call GetId APIs")
+    response = client.get_id(AccountId=account_id,IdentityPoolId=identity_pool_id,Logins={'accounts.google.com': id_token})
     identity_id = response['IdentityId']
-    print ("Identity ID: %s"%identity_id)
-    classic_authflow = cognito_client.get_open_id_token(IdentityId=identity_id,Logins={'accounts.google.com': id_token})
+    print ("INFO: Identity ID is ", identity_id)
+    print ("INFO: Call GetOpenIdToken API")
+    classic_authflow = client.get_open_id_token(IdentityId=identity_id,Logins={'accounts.google.com': id_token})
     token = classic_authflow['Token']
-    print("Cognito Token: %s" %token)
-    print("Google Token: %s" %id_token)
-    RoleARN='arn:aws:iam::173349731798:role/POCSSOAssumeRoleForAuthenticatedUSer'
+    print("INFO: Google OpenID Token: ", id_token)
+    print("INFO: Cognito OpenID Token ", token)
+    print("INFO: Initialize STS Client ")
     sts_client = boto3.client('sts')
-    assume_role_response = sts_client.assume_role_with_web_identity(RoleArn=RoleARN,RoleSessionName='invoke',WebIdentityToken=id_token,DurationSeconds=900)
+    print("INFO: Call AssumeRoleWithWebIdentity API ")
+    assume_role_response = sts_client.assume_role_with_web_identity(RoleArn=roleARN,RoleSessionName='invoke',WebIdentityToken=id_token,DurationSeconds=900)
     secretKey = assume_role_response['Credentials']['SecretAccessKey']
     accessKey = assume_role_response['Credentials']['AccessKeyId']
     sessionToken = assume_role_response['Credentials']['SessionToken']
     expiration = assume_role_response['Credentials']['Expiration']
+    return accessKey, secretKey, sessionToken, expiration
 
+def callApiGatewayGet(uri,accessKey,secretKey,sessionToken):
     method = 'GET'
     headers = {}
     body = ''
     service = 'execute-api'
-    url = 'https://gj6ma8utnd.execute-api.eu-west-1.amazonaws.com/dev/bike/test'
-    region = 'eu-west-1'
-
     auth = AWS4Auth(accessKey, secretKey, region, service, session_token=sessionToken)
-    response = requests.request(method, url, auth=auth, data=body, headers=headers)
-    print(response.text)
-
-
+    response = requests.request(method, uri, auth=auth, data=body, headers=headers)
+    return response.text
 
 def main():
-    print('[1] Create antiforgery state token')
+    print('STEP [1] Create antiforgery state token')
     state_token = getAntiForgery()
-    print('[1.1] Antiforgery state token is ' + state_token  )
-    print('[2] Create authentication request')
+    print('INFO: Antiforgery state token is ' + state_token  )
+    print('STEP [2] Create authentication request')
     uri = getConnectAuthURI(oauth2_client_id, oauth2_scope, oauth2_redirect_uri, state_token)
-    print('[2.1] Authentication request is ' + uri)
-    callback = input('[3] Paste the callback url here: ')
-    print('[4] Verify State Token')
-    if verifyStateToken(callback,state_token) is False:
-        print('[4.1] State Token mismatch')
+    print('INFO: Authentication request is ' + uri)
+    callback = input('INFO: Paste the callback url here: ')
+    print('STEP [3] Verify State Token')
+    verified, reply_state = verifyStateToken(callback,state_token)
+    if verified is False:
+        print('INFO: State Token is ', state_token)
+        print('INFO: Reply Token is ', reply_state)
+        print('INFO: State Token mismatch')
         exit(1)
     else:
-        print('[4.1] State Token match')
-    print('[5] Exchange Code for Access Token and ID Token')
+        print('INFO: State Token is', state_token)
+        print('INFO: Reply Token is', reply_state)
+        print('INFO: State Token match')
+    print('STEP [4] Exchange Code for Access Token and ID Token')
     code = extractCode(callback)
-    print('[5.1] Code is ' + code)
+    print('INFO: Code is ' + code)
     response = getAccessOpenIdToken(code, oauth2_client_id, oauth2_client_secret, oauth2_redirect_uri)
     access_token = response.json()['access_token']
     id_token = response.json()['id_token']
-    print('[5.2] Access Token: ' + access_token)
-    print('[5.3] OpenID Token: ' + id_token)
-    print('[5.4] Call Cognito')
-    getCredentialsForIdentityWithCognito(id_token)
+    print('INFO: Access Token: ', access_token)
+    print('INFO: OpenID Token: ', id_token)
+    print('STEP [5] Call Cognito')
+    cognito_client = boto3.client('cognito-identity',region_name=region)
+    print ("INFO: Using Cognito Enhanced (Simplified) Authflow")
+    accessKey, secretKey, sessionToken, expiration = getCredentialsForIdentityWithCognito(cognito_client,id_token)
+    print ("INFO: AccessKey ", accessKey)
+    print ("INFO: SecretKey ", secretKey)
+    print ("INFO: Using Cognito Basic (Classic) Authflow")
+    accessKey, secretKey, sessionToken, expiration = getCredentialsForIdentityWithCognito(cognito_client,id_token)
+    print ("INFO: AccessKey ", accessKey)
+    print ("INFO: SecretKey ", secretKey)
+    print ('STEP [6] Call AWS Services')
+    print ('INFO: Invoke ', apiGatewayUri)
+    response = callApiGatewayGet(apiGatewayUri,accessKey,secretKey,sessionToken)
+    print ('INFO: Response ', response)
     #    response = cognito_client.get_credentials_for_identity(IdentityId=identity_pool_id,Logins={'logins.salesforce.com': id_token}, CustomRoleArn='string')
 
 
