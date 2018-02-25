@@ -14,6 +14,8 @@ from requests_aws4auth import AWS4Auth
 
 oauth2_client_id = os.environ['OAUTH2_CLIENT_ID']
 oauth2_client_secret = os.environ['OAUTH2_CLIENT_SECRET']
+identity_pool_id = os.environ['COGNITO_POOL_ID']
+account_id = os.environ['AWS_ACCOUNT_ID']
 
 # To be OpenID-compliant, you must include the openid profile scope in your authentication request.
 oauth2_scope = 'openid email profile'
@@ -60,8 +62,7 @@ def getAccessOpenIdToken(code, client_id, client_secret, redirect_uri):
 #https://docs.aws.amazon.com/cognito/latest/developerguide/authentication-flow.html
 def getCredentialsForIdentityWithCognito(id_token):
     cognito_client = boto3.client('cognito-identity',region_name='eu-west-1')
-    identity_pool_id='eu-west-1:1ad92bc1-d85d-497b-8d52-db3c4317e614'
-    account_id='173349731798'
+
     # Enhanced (Simplified) Authflow
     # 1.GetId
     # 2.GetCredentialsForIdentity

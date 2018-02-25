@@ -43,6 +43,8 @@ pip install requests-aws4auth
 ```
 export OAUTH2_CLIENT_ID="123456789-abcdefghilmnopqrstuvxyz.apps.googleusercontent.com"  
 export OAUTH2_CLIENT_SECRET="abcdefghilmnopqrstuvxy"
+export AWS_ACCOUNT_ID="12345678910"
+export COGNITO_POOL_ID="eu-west-1:abcdefg-abcdefg-abcdefg-abcdefg-abcdefg"
 ```
 
 ### Launch the Google demo
