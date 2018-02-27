@@ -24,6 +24,58 @@ https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers_create_oidc.
 Amazon Cognito Federated Identities enable you to create unique identities and assign permissions for users. [More info](
 https://docs.aws.amazon.com/cognito/latest/developerguide/getting-started-with-identity-pools.html)
 
+During the Identity Federation Wizard Cognito will create two roles: Authorized and UnAuthorized and configure on these role the Trusted Relationship as this
+
+**Authenticated Trust Relationship**
+
+```
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "cognito-identity.amazonaws.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "cognito-identity.amazonaws.com:aud": "eu-west-1:123456-123456-123456-123456-123456"
+        },
+        "ForAnyValue:StringLike": {
+          "cognito-identity.amazonaws.com:amr": "authenticated"
+        }
+      }
+    }
+  ]
+}
+```
+
+**UnAuthenticated Trust Relationship**
+
+```
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "cognito-identity.amazonaws.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "cognito-identity.amazonaws.com:aud": "eu-west-1:123456-123456-123456-123456-123456"
+        },
+        "ForAnyValue:StringLike": {
+          "cognito-identity.amazonaws.com:amr": "unauthenticated"
+        }
+      }
+    }
+  ]
+}
+```
+
 ### Associating a Provider to Amazon Cognito
 Once you've created an OpenID Connect provider in the IAM Console, you can associate it to an identity pool. All configured providers will be visible in the Edit Identity Pool screen in the Amazon Cognito Console under the OpenID Connect Providers header.
 
@@ -53,12 +105,11 @@ The GetCredentialsForIdentity API can be called after you establish an identity 
 
 Returns a set of temporary security credentials for users who have been authenticated in a mobile or web application with a web identity provider, such as Amazon Cognito, Login with Amazon, Facebook, Google, or any OpenID Connect-compatible identity provider. [More info](https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRoleWithWebIdentity.html)
 
-If you want to exchange a OpenID token coming from Cognito with STS you need to invoke the [GetOpenIdToken](https://docs.aws.amazon.com/cognitoidentity/latest/APIReference/API_GetOpenIdToken.html) API
+If you want to exchange a OpenID token coming from Cognito with STS you need to invoke the [GetOpenIdToken](https://docs.aws.amazon.com/cognitoidentity/latest/APIReference/API_GetOpenIdToken.html) API before
 
 ![Enhanced Flow](img/amazon-cognito-ext-auth-basic-flow.png)
 
-### Role-Based Access Control
-Amazon Cognito Federated Identities assigns your authenticated users a set of temporary, limited privilege credentials to access your AWS resources. You can define rules to choose the role for each user based on claims in the user's ID token. To enable Role-Based Access Control and allows federated users from cognito-identity.amazonaws.com (the issuer of the OpenID Connect token) to assume this role. you need to create a role with a
+ a
 
 ## Configure iam
 
@@ -68,25 +119,7 @@ Before you can create a role for web identity federation, you must first complet
 
 When you use Amazon Cognito to manage identities you must set a trust policy to permit user coming from Identity Provider (the issuer of the OpenID Connect token) to assume the role
 
-```
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Federated": "arn:aws:iam::AWS_ACCOUNT_ID:oidc-provider/accounts.google.com"
-      },
-      "Action": "sts:AssumeRoleWithWebIdentity",
-      "Condition": {
-        "StringEquals": {
-          "accounts.google.com:aud": "OAUTH2_CLIENT_ID"
-        }
-      }
-    }
-  ]
-}
-```
+
 And The policy associated with This
 
 ### Configure IAM Policy
