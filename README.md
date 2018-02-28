@@ -249,6 +249,8 @@ The role that your application assumes must trust the user that is associated wi
 
 The Condition element of an JSON policy in IAM allows you to test the value of keys that are included in the evaluation context of all AWS API requests. The Keys available are explained [here](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_condition-keys.html#condition-keys-wif)
 
+https://docs.aws.amazon.com/IAM/latest/UserGuide/list_sts.html
+
 ## Create Virtual Environment
 
 ```
@@ -264,12 +266,16 @@ pip install requests
 pip install requests-aws4auth
 ```
 
-### Setting OAUTH2 credential
+### Setting Environment
 ```
-export OAUTH2_CLIENT_ID="123456789-abcdefghilmnopqrstuvxyz.apps.googleusercontent.com"  
-export OAUTH2_CLIENT_SECRET="abcdefghilmnopqrstuvxy"
-export AWS_ACCOUNT_ID="12345678910"
-export COGNITO_POOL_ID="eu-west-1:abcdefg-abcdefg-abcdefg-abcdefg-abcdefg"
+export OAUTH2_CLIENT_ID=123456789-abcdefghilmnopqrstuvxyz.apps.googleusercontent.com
+export OAUTH2_CLIENT_SECRET=abcdefghilmnopqrstuvxy
+export AWS_ACCOUNT_ID=12345678910
+export COGNITO_POOL_ID=eu-west-1:abcdefg-abcdefg-abcdefg-abcdefg-abcdefg
+export AWS_REGION=eu-west-1
+export STS_ROLE_ARN=arn:aws:::test
+export AWS_SERVICE="execute-api"
+export API_URI=https://123456789.execute-api.eu-west-1.amazonaws.com/dev/bike/test
 ```
 
 ### Launch the Google demo
