@@ -66,8 +66,7 @@ This two role has a following IAM Policies
 }
 ```
 
-You cam configure this policies for add or remove permission on end users
-This two role has the following Trusted Relationship
+The Amazon Cognito console will create these for you by default when you first set up your identity pool. The access policy for these two roles will be exactly the same: it will grant users access to Amazon Cognito Sync as well as to submit events to Amazon Mobile Analytics. You are welcome and encouraged to modify these roles to meet your needs. This two role has the following Trusted Relationship
 
 **Authenticated Trust Relationship**
 
@@ -118,21 +117,25 @@ This two role has the following Trusted Relationship
   ]
 }
 ```
-This relationship is necessary for guarantee that only users from this Cognito Identity Fedeartion can assume this roles.
+This relationship is necessary for guarantee that only users from this Cognito Identity Federation can assume this roles.
 
 ### Associating a Provider to Amazon Cognito
 Once you've created an OpenID Connect provider in the IAM Console, you can associate it to an identity pool. All configured providers will be visible in the Edit Identity Pool screen in the Amazon Cognito Console under the OpenID Connect Providers header.
 
 ![Provider Cognito](img/AuthenticationProvider.png)
 
-### Cognito - GetCredentialsForIdentity API
-Returns credentials for the provided identity ID. Any provided logins will be validated against supported login providers. After validation the STS return a default role or custom role (only for identity providers that support role customization as SAML2) to Cognito and Cognito sent this to end user. [More info](https://docs.aws.amazon.com/cognitoidentity/latest/APIReference/API_GetCredentialsForIdentity.html)
+### Cognito - Implement Enhanced (Simplified) Authflow
+
+The Enhanced (Simplified) Authflow is completed with two API call:
+1. *GetId:* The GetId API call is the first call necessary to establish a new identity in Amazon Cognito
+2. *GetCredentialsForIdentity:* The GetCredentialsForIdentity API can be called after you establish an identity ID. This API is functionally equivalent to calling GetOpenIdToken followed by AssumeRoleWithWebIdentity.
 
 ![Enhanced Flow](img/amazon-cognito-ext-auth-enhanced-flow.png)
 
-The GetCredentialsForIdentity API can be called after you establish an identity ID. This API is functionally equivalent to calling GetOpenIdToken followed by AssumeRoleWithWebIdentity.
+#### Cognito GetCredentialsForIdentity API
+Returns credentials for the provided identity ID. Any provided logins will be validated against supported login providers. After validation the STS return a default role or custom role (only for identity providers that support role customization as SAML2) to Cognito and Cognito sent this to end user. [More info](https://docs.aws.amazon.com/cognitoidentity/latest/APIReference/API_GetCredentialsForIdentity.html)
 
-**Note** At this moment Cognito GetCredentialsForIdentity API on OpenID Connect identity provider (as SalesForce) not support role mapping rule then support only two roles: Authenticated and UnAuthenticated.
+**Note:** At this moment Cognito GetCredentialsForIdentity API on OpenID Connect identity provider (as SalesForce) not support role mapping rule then support only two roles: Authenticated and UnAuthenticated.
 
 ```
 {
@@ -144,15 +147,20 @@ The GetCredentialsForIdentity API can be called after you establish an identity 
 }
 ```
 
+### Cognito - Implement Basic (Classic) Authflow
 
-### STS - AssumeRoleWithWebIdentity API
+The Basic (Classic) Authflow is completed with three API call:
+1. *GetId:* The GetId API call is the first call necessary to establish a new identity in Amazon Cognito
+2. *GetOpenIdToken:* The GetOpenIdToken API call is called after you establish an identity ID. If you have a cached identity ID, this can be the first call you make during an app session.
+3. *AssumeRoleWithWebIdentity:* Once you have an OpenID Connect token, you can then trade this for temporary AWS credentials via the AssumeRoleWithWebIdentity API call in AWS Security Token Service (STS)
 
-Returns a set of temporary security credentials for users who have been authenticated in a mobile or web application with a web identity provider, such as Amazon Cognito, Login with Amazon, Facebook, Google, or any OpenID Connect-compatible identity provider. [More info](https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRoleWithWebIdentity.html)
+![Basic Flow](img/amazon-cognito-ext-auth-basic-flow.png)
 
-If you want to exchange a OpenID token coming from Cognito with STS you need to invoke the [GetOpenIdToken](https://docs.aws.amazon.com/cognitoidentity/latest/APIReference/API_GetOpenIdToken.html) API before
+#### STS AssumeRoleWithWebIdentity API
 
-![Enhanced Flow](img/amazon-cognito-ext-auth-basic-flow.png)
+Returns a set of temporary security credentials for users who have been authenticated in a mobile or web application with a web identity provider, such as Amazon Cognito, Login with Amazon, Facebook, Google, or any OpenID Connect-compatible identity provider. [More info]((https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRoleWithWebIdentity.html)
 
+**Note:** In Cognito Basic (Classic) Authflow, the call on STS is no different than if you were using Facebook, Google+, or Login with Amazon directly, except that you are passing an Amazon Cognito token instead of a token from one of the other public providers.
 
 ## Configure API gateway
 You can use the API Gateway Import API feature to import an API from an external definition file into API Gateway. Currently, the Import API feature supports Swagger v2.0 definition files.  
@@ -172,7 +180,7 @@ On Integration Response from Method Execution. Expand the 200 response and then 
 ## Configure IAM
 In the process of creating an identity pool, you'll be prompted to update the IAM roles that your users assume. IAM roles work like this: When a user logs in to your app, Amazon Cognito generates temporary AWS credentials for the user. These temporary credentials are associated with a specific IAM role. The IAM role lets you define a set of permissions to access your AWS resources.
 
-### Configure IAM for GetCredentialsForIdentity
+### Configure IAM for GetCredentialsForIdentity API
 
 Now you must to Control who can invoke the protected API, creating an IAM policy document with required permissions. This policie will be attached to **Authenticated Role** created before during Cognito configuration.
 
@@ -193,34 +201,53 @@ Now you must to Control who can invoke the protected API, creating an IAM policy
 }
 ```
 
+### Configure IAM for AssumeRoleWithWebIdentity API
+
+Calling AssumeRoleWithWebIdentity does not require the use of AWS security credentials. Therefore, you can distribute an application (for example, on mobile devices) that requests temporary security credentials without including long-term AWS credentials in the application, and without deploying server-based proxy services that use long-term AWS credentials. Before your application can call AssumeRoleWithWebIdentity, you must have an identity token from a supported identity provider and create a [Role for Web Identity](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-idp_oidc.html) that the application can assume.
+
+This role must to have the IAM policie necessary to invoke the API Gateway resource.
 
 
-### Configure Trusted Relationship
-
-When you use Amazon Cognito to manage identities you must set a trust policy to permit user coming from Identity Provider (the issuer of the OpenID Connect token) to assume the role
-
-
-And The policy associated with This
-
-### Configure IAM Policy
 ```
 {
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Sid": "VisualEditor0",
-            "Effect": "Allow",
-            "Action": "*",
-            "Resource": "*",
-            "Condition": {
-                "StringEquals": {
-                    "accounts.google.com:sub": "111501939861489290614"
-                }
-            }
-        }
-    ]
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Permission",
+      "Action": [
+        "execute-api:Invoke"           
+      ],
+      "Resource": [
+        "arn:aws:execute-api:region:account-id:api-id/stage/METHOD_HTTP_VERB/Resource-path"
+      ]
+    }
+  ]
 }
 ```
+
+The role that your application assumes must trust the user that is associated with the identity token. In other words, the identity provider or user must be specified in the role's trust policy.
+
+```
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::103204280208:oidc-provider/accounts.google.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "accounts.google.com:aud": "428995339229-bbb0jict0t2hiaja5jh5j3sqs5uco0gc.apps.googleusercontent.com"
+        }
+      }
+    }
+  ]
+}
+```
+
+The Condition element of an JSON policy in IAM allows you to test the value of keys that are included in the evaluation context of all AWS API requests. The Keys available are explained [here](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_condition-keys.html#condition-keys-wif)
 
 ## Create Virtual Environment
 
@@ -254,3 +281,7 @@ export COGNITO_POOL_ID="eu-west-1:abcdefg-abcdefg-abcdefg-abcdefg-abcdefg"
 ```
 python salesforce-oauth2.py
 ```
+
+Creare ruolo per Assume Role con Variabili
+https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-idp_oidc.html
+https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers_oidc_user-id.html
